@@ -1,4 +1,4 @@
-// Package responsebodyrewrite contains the implementation of a middleware that filters unwanted response headers.
+// Package responsebodyrewrite provides a middleware that rewrites the response body based on the status code and the content of the response.
 package traefik_responsebodyrewrite
 
 import (
@@ -34,7 +34,7 @@ type Rewrite struct {
 
 // Response holds one response configuration.
 type Response struct {
-	Rewrites []Rewrite `json:"rewrite,omitempty"`
+	Rewrites []Rewrite `json:"rewrites,omitempty"`
 	Status   string    `json:"status,omitempty"`
 }
 
@@ -50,7 +50,7 @@ func CreateConfig() *Config {
 	}
 }
 
-// responsebodyrewrite is a middleware that filters unwanted response headers.
+// responsebodyrewrite is a middleware that rewrites the response body based on the status code and the content of the response.
 type responsebodyrewrite struct {
 	next         http.Handler
 	name         string
@@ -105,7 +105,7 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 }
 
 // ServeHTTP is the method that handles the HTTP request.
-// It calls the next handler in the chain and modifies the response headers.
+// It rewrites the response body based on the status code and the content of the response.
 func (r *responsebodyrewrite) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	wrappedWriter := &responseWriter{
