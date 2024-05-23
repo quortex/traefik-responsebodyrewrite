@@ -1,0 +1,21 @@
+log:
+  level: INFO
+
+experimental:
+  localPlugins:
+    traefik-responsebodyrewrite:
+      moduleName: github.com/quortex/traefik-responsebodyrewrite
+
+# API and dashboard configuration
+entryPoints:
+  http:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+  file:
+    filename: /etc/traefik/dynamic-configuration.yml

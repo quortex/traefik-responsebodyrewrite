@@ -1,0 +1,17 @@
+displayName: Response Body Rewrite Plugin
+type: middleware
+
+import: github.com/quortex/traefik-responsebodyrewrite
+
+summary: "This repo contains a Traefik plugin that allows you to rewrite response body based on a parameters."
+
+testData:
+  responses:
+    - status: 200
+      rewrites:
+        - regex: foo
+          replacement: "Bar"
+    - status: 400-499
+      rewrites:
+        - regex: .*
+          replacement: "Error Replacement"

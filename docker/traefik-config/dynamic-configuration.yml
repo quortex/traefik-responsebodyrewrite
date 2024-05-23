@@ -1,0 +1,14 @@
+http:
+  middlewares:
+    my-traefik-responsebodyrewrite:
+      plugin:
+        traefik-responsebodyrewrite:
+          responses:
+            - status: 200
+              rewrites:
+                - regex: foo
+                  replacement: Bar
+            - status: 400-499
+              rewrites:
+                - regex: .*
+                  replacement: "Error Replacement"
