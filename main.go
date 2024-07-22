@@ -119,16 +119,6 @@ func (r *responsebodyrewrite) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	bodyBytes := wrappedWriter.buffer.Bytes()
 
-	contentEncoding := wrappedWriter.Header().Get("Content-Encoding")
-
-	if contentEncoding != "" && contentEncoding != "identity" {
-		if _, err := rw.Write(bodyBytes); err != nil {
-			r.infoLogger.Printf("unable to write body: %v", err)
-		}
-
-		return
-	}
-
 	for _, response := range r.responses {
 		if !response.status.Contains(wrappedWriter.code) {
 			continue
@@ -139,9 +129,19 @@ func (r *responsebodyrewrite) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		break
 	}
 
+	contentEncoding := wrappedWriter.Header().Get("Content-Encoding")
+	if contentEncoding != "" && contentEncoding != "identity" {
+		if _, err := rw.Write(bodyBytes); err != nil {
+			r.infoLogger.Printf("unable to write body: %v", err)
+		}
+		return
+	}
+
 	if _, err := rw.Write(bodyBytes); err != nil {
 		r.infoLogger.Printf("unable to write rewrited body: %v", err)
 	}
+
+	rw.Header().Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
 
 }
 
