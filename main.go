@@ -52,11 +52,10 @@ func CreateConfig() *Config {
 
 // responsebodyrewrite is a middleware that rewrites the response body based on the status code and the content of the response.
 type responsebodyrewrite struct {
-	next         http.Handler
-	name         string
-	responses    []parsedResponse
-	lastModified bool
-	infoLogger   *log.Logger
+	next       http.Handler
+	name       string
+	responses  []parsedResponse
+	infoLogger *log.Logger
 }
 
 // New creates a new instance of the responsebodyrewrite middleware.
@@ -96,11 +95,10 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 	}
 
 	return &responsebodyrewrite{
-		responses:    parsedResponses,
-		next:         next,
-		name:         name,
-		lastModified: true,
-		infoLogger:   infoLogger,
+		responses:  parsedResponses,
+		next:       next,
+		name:       name,
+		infoLogger: infoLogger,
 	}, nil
 }
 
@@ -109,10 +107,10 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 func (r *responsebodyrewrite) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	wrappedWriter := &responseWriter{
-		lastModified:   r.lastModified,
 		code:           http.StatusOK,
 		headerMap:      make(http.Header),
 		ResponseWriter: rw,
+		responses:      r.responses,
 	}
 
 	r.next.ServeHTTP(wrappedWriter, req)
@@ -129,49 +127,40 @@ func (r *responsebodyrewrite) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		break
 	}
 
-	contentEncoding := wrappedWriter.Header().Get("Content-Encoding")
-	if contentEncoding != "" && contentEncoding != "identity" {
-		if _, err := rw.Write(bodyBytes); err != nil {
-			r.infoLogger.Printf("unable to write body: %v", err)
-		}
-		return
-	}
-
 	if _, err := rw.Write(bodyBytes); err != nil {
-		r.infoLogger.Printf("unable to write rewrited body: %v", err)
+		r.infoLogger.Printf("unable to write body: %v", err)
 	}
-
-	rw.Header().Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
 
 }
 
 // responseWriter is a wrapper around an http.ResponseWriter that allows us to intercept the response.
 // It implements the http.ResponseWriter interface.
 type responseWriter struct {
-	buffer       bytes.Buffer
-	lastModified bool
-	headerMap    http.Header
-	headersSent  bool
-	code         int
+	buffer      bytes.Buffer
+	headerMap   http.Header
+	headersSent bool
+	code        int
 	http.ResponseWriter
+	responses []parsedResponse
 }
 
 // Headers implements the http.ResponseWriter interface.
-func (r *responseWriter) Header() http.Header {
-	if r.headersSent {
-		return r.ResponseWriter.Header()
+func (rw *responseWriter) Header() http.Header {
+	if rw.headersSent {
+		return rw.ResponseWriter.Header()
 	}
 
-	if r.headerMap == nil {
-		r.headerMap = make(http.Header)
+	if rw.headerMap == nil {
+		rw.headerMap = make(http.Header)
 	}
 
-	return r.headerMap
+	return rw.headerMap
 }
 
 // WriteHeader implements the http.ResponseWriter interface.
-func (r *responseWriter) WriteHeader(statusCode int) {
-	if r.headersSent {
+// It intercepts the response status code and stores it in the responseWriter struct.
+func (rw *responseWriter) WriteHeader(statusCode int) {
+	if rw.headersSent {
 		return
 	}
 
@@ -179,51 +168,56 @@ func (r *responseWriter) WriteHeader(statusCode int) {
 	if statusCode >= 100 && statusCode <= 199 {
 		// Multiple informational status codes can be used,
 		// so here the copy is not appending the values to not repeat them.
-		for k, v := range r.Header() {
-			r.ResponseWriter.Header()[k] = v
+		for k, v := range rw.Header() {
+			rw.ResponseWriter.Header()[k] = v
 		}
 
-		r.ResponseWriter.WriteHeader(statusCode)
+		rw.ResponseWriter.WriteHeader(statusCode)
 		return
 	}
 
-	r.code = statusCode
+	rw.code = statusCode
 
-	// The copy is not appending the values,
-	// to not repeat them in case any informational status code has been written.
-	for k, v := range r.Header() {
-		r.ResponseWriter.Header()[k] = v
+	// Check if the status code is in the list of status codes to rewrite.
+	var bodyRewrited bool
+	for _, response := range rw.responses {
+		if !response.status.Contains(statusCode) {
+			continue
+		}
+		bodyRewrited = true
 	}
 
-	// Delegates the Content-Length Header creation to the final body write.
-	r.ResponseWriter.Header().Del("Content-Length")
-	r.ResponseWriter.WriteHeader(r.code)
-	r.headersSent = true
+	// Remove Content-Length header if the body is being rewritten.
+	if bodyRewrited {
+		rw.ResponseWriter.Header().Del("Content-Length")
+	}
+
+	rw.ResponseWriter.WriteHeader(rw.code)
+	rw.headersSent = true
 }
 
 // Write implements the http.ResponseWriter interface.
-func (r *responseWriter) Write(p []byte) (int, error) {
+func (rw *responseWriter) Write(p []byte) (int, error) {
 
-	if !r.headersSent {
-		r.WriteHeader(http.StatusOK)
+	if !rw.headersSent {
+		rw.WriteHeader(http.StatusOK)
 	}
 
-	return r.buffer.Write(p)
+	return rw.buffer.Write(p)
 }
 
 // Hijack implements the http.Hijacker interface.
-func (r *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hijacker, ok := r.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, fmt.Errorf("%T is not a http.Hijacker", r.ResponseWriter)
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := rw.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
 	}
 
-	return hijacker.Hijack()
+	return nil, nil, fmt.Errorf("not a hijacker: %T", rw.ResponseWriter)
 }
 
 // Flush implements the http.Flusher interface.
-func (r *responseWriter) Flush() {
-	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
+func (rw *responseWriter) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
 }

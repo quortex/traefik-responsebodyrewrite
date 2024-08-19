@@ -137,5 +137,5 @@ curl  -v "http://localhost:8080?echo_body=foobrady&echo_code=500"
 ```
 - 200 should return `Barbrady`
 - 404 should return `Error Replacement`
-- 500 should not be modified and return `barbrady`
+- 500 should not be modified and return `Barbrady`
 

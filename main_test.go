@@ -76,7 +76,7 @@ func TestServeHTTP(t *testing.T) {
 			expResBody: "foo is the new foo",
 		},
 		{
-			desc:       "should not replace anything if content encoding is not identity or empty",
+			desc:       "should replace fo by bar if content encoding is not identity or empty & match response",
 			httpStatus: http.StatusOK,
 			responses: []Response{
 				{
@@ -91,7 +91,7 @@ func TestServeHTTP(t *testing.T) {
 			},
 			contentEncoding: "gzip",
 			resBody:         "foo is the new bar",
-			expResBody:      "foo is the new bar",
+			expResBody:      "bar is the new bar",
 		},
 		{
 			desc:       "should replace foo by bar if content encoding is identity",
