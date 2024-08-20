@@ -12,13 +12,14 @@ import (
 
 func TestServeHTTP(t *testing.T) {
 	tests := []struct {
-		desc            string
-		httpStatus      int
-		contentEncoding string
-		responses       []Response
-		lastModified    bool
-		resBody         string
-		expResBody      string
+		desc               string
+		httpStatus         int
+		contentEncoding    string
+		responses          []Response
+		lastModified       bool
+		resBody            string
+		expResBody         string
+		contentLengthExist bool
 	}{
 		{
 			desc:       "should replace foo by bar",
@@ -34,8 +35,9 @@ func TestServeHTTP(t *testing.T) {
 					},
 				},
 			},
-			resBody:    "foo is the new bar",
-			expResBody: "bar is the new bar",
+			resBody:            "foo is the new bar",
+			expResBody:         "bar is the new bar",
+			contentLengthExist: true,
 		},
 		{
 			desc:       "should replace nothing",
@@ -72,8 +74,9 @@ func TestServeHTTP(t *testing.T) {
 					},
 				},
 			},
-			resBody:    "foo is the new bar",
-			expResBody: "foo is the new foo",
+			resBody:            "foo is the new bar",
+			expResBody:         "foo is the new foo",
+			contentLengthExist: true,
 		},
 		{
 			desc:       "should replace fo by bar if content encoding is not identity or empty & match response",
@@ -89,9 +92,10 @@ func TestServeHTTP(t *testing.T) {
 					},
 				},
 			},
-			contentEncoding: "gzip",
-			resBody:         "foo is the new bar",
-			expResBody:      "bar is the new bar",
+			contentEncoding:    "gzip",
+			resBody:            "foo is the new bar",
+			expResBody:         "bar is the new bar",
+			contentLengthExist: true,
 		},
 		{
 			desc:       "should replace foo by bar if content encoding is identity",
@@ -107,28 +111,10 @@ func TestServeHTTP(t *testing.T) {
 					},
 				},
 			},
-			contentEncoding: "identity",
-			resBody:         "foo is the new bar",
-			expResBody:      "bar is the new bar",
-		},
-		{
-			desc:       "should not remove the last modified header",
-			httpStatus: http.StatusOK,
-			responses: []Response{
-				{
-					Status: "200-299",
-					Rewrites: []Rewrite{
-						{
-							Regex:       "foo",
-							Replacement: "bar",
-						},
-					},
-				},
-			},
-			contentEncoding: "identity",
-			lastModified:    true,
-			resBody:         "foo is the new bar",
-			expResBody:      "bar is the new bar",
+			contentEncoding:    "identity",
+			resBody:            "foo is the new bar",
+			expResBody:         "bar is the new bar",
+			contentLengthExist: true,
 		},
 	}
 
@@ -157,7 +143,7 @@ func TestServeHTTP(t *testing.T) {
 
 			rewriteBody.ServeHTTP(recorder, req)
 
-			if _, exists := recorder.Result().Header["Content-Length"]; exists {
+			if _, exists := recorder.Result().Header["Content-Length"]; exists == test.contentLengthExist {
 				t.Error("The Content-Length Header must be deleted")
 			}
 

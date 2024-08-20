@@ -144,19 +144,6 @@ type responseWriter struct {
 	responses []parsedResponse
 }
 
-// Headers implements the http.ResponseWriter interface.
-func (rw *responseWriter) Header() http.Header {
-	if rw.headersSent {
-		return rw.ResponseWriter.Header()
-	}
-
-	if rw.headerMap == nil {
-		rw.headerMap = make(http.Header)
-	}
-
-	return rw.headerMap
-}
-
 // WriteHeader implements the http.ResponseWriter interface.
 // It intercepts the response status code and stores it in the responseWriter struct.
 func (rw *responseWriter) WriteHeader(statusCode int) {
@@ -164,36 +151,19 @@ func (rw *responseWriter) WriteHeader(statusCode int) {
 		return
 	}
 
-	// Handling informational headers.
-	if statusCode >= 100 && statusCode <= 199 {
-		// Multiple informational status codes can be used,
-		// so here the copy is not appending the values to not repeat them.
-		for k, v := range rw.Header() {
-			rw.ResponseWriter.Header()[k] = v
-		}
-
-		rw.ResponseWriter.WriteHeader(statusCode)
-		return
-	}
-
 	rw.code = statusCode
 
 	// Check if the status code is in the list of status codes to rewrite.
-	var bodyRewrited bool
 	for _, response := range rw.responses {
 		if !response.status.Contains(statusCode) {
 			continue
 		}
-		bodyRewrited = true
-	}
-
-	// Remove Content-Length header if the body is being rewritten.
-	if bodyRewrited {
 		rw.ResponseWriter.Header().Del("Content-Length")
+		break
 	}
-
-	rw.ResponseWriter.WriteHeader(rw.code)
 	rw.headersSent = true
+
+	rw.ResponseWriter.WriteHeader(statusCode)
 }
 
 // Write implements the http.ResponseWriter interface.

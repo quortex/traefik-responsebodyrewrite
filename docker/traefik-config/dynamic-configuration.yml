@@ -7,7 +7,7 @@ http:
             - status: 200
               rewrites:
                 - regex: foo
-                  replacement: Bar
+                  replacement: Bara
             - status: 400-499
               rewrites:
                 - regex: .*
